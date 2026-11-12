@@ -3,332 +3,1180 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title>XAU/USD Heatmap Twelve Data</title>
-
+<title>XAU/USD Heatmap - Twelve Data</title>
 <script src="https://cdn.tailwindcss.com"></script>
-
 <style>
-body{
-    background:#0b0e14;
-    color:white;
-}
-
-.card{
-    background:#131722;
-    border:1px solid #2a2e39;
-}
+    body { background:#0b0e14; color:#e5e7eb; }
+    .card { background:#131722; border:1px solid #2a2e39; }
+    .cell { border-radius:6px; padding:6px 8px; font-weight:700; text-align:center; white-space:nowrap; }
+    .spin { animation: spin 1s linear infinite; display:inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 
-<body class="p-6">
-
+<body class="p-4 md:p-6">
 <div class="max-w-6xl mx-auto">
 
-    <h1 class="text-3xl font-bold mb-6">
-        XAU/USD Heatmap
-    </h1>
-
-    <!-- API KEY -->
-
-    <div class="card rounded-xl p-4 mb-6">
-
-        <label class="block text-sm mb-2">
-            Clé API Twelve Data
-        </label>
-
-        <div class="flex gap-2">
-
-            <input
-                id="apiKey"
-                type="password"
-                placeholder="Entrer votre clé API"
-                class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2"
-            >
-
-            <button
-                onclick="saveKey()"
-                class="bg-amber-500 text-black px-4 rounded font-bold">
-                Sauver
-            </button>
-
+    <!-- EN-TÊTE -->
+    <div class="flex flex-wrap items-end justify-between gap-2 mb-6">
+        <div>
+            <h1 class="text-3xl font-bold">XAU/USD <span class="text-amber-400">Heatmap</span></h1>
+            <div id="sessions" class="flex flex-wrap gap-2 mt-2 text-xs"></div>
         </div>
-
+        <div class="text-right">
+            <div id="price" class="text-3xl font-bold">--</div>
+            <div id="updated" class="text-xs text-slate-400">Jamais actualisé</div>
+        </div>
     </div>
 
-    <!-- SIGNAL -->
-
-    <div class="card rounded-xl p-6 mb-6">
-
-        <h2 class="text-xl font-bold mb-4">
-            Signal Global
-        </h2>
-
-        <div id="globalSignal"
-            class="text-4xl font-bold text-center">
-            EN ATTENTE
+    <!-- CLE API -->
+    <div class="card rounded-xl p-4 mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <label for="apiKey" class="text-sm font-semibold">Clé API Twelve Data</label>
+            <span id="keyBadge" class="text-xs px-2 py-1 rounded bg-slate-700 text-slate-300">Aucune clé enregistrée</span>
         </div>
+        <div class="flex flex-wrap gap-2">
+            <input id="apiKey" type="password" autocomplete="off"
+                placeholder="Collez votre clé API ici puis cliquez sur « Sauver »"
+                class="flex-1 min-w-[200px] bg-slate-900 border border-slate-700 rounded px-3 py-2">
+            <button id="toggleKey" type="button" class="bg-slate-700 px-3 rounded">Afficher</button>
+            <button id="saveKey" type="button" class="bg-amber-500 text-black px-4 rounded font-bold">Sauver</button>
+            <button id="clearKey" type="button" class="bg-slate-700 px-3 rounded">Effacer</button>
+        </div>
+        <ul class="text-xs text-slate-400 mt-3 space-y-1 list-disc pl-5">
+            <li>Obtenir une clé gratuite : <a class="text-amber-400 underline" href="https://twelvedata.com/account/api-keys" target="_blank" rel="noopener">twelvedata.com/account/api-keys</a>.</li>
+            <li>Où elle est sauvegardée : dans le <b>localStorage de ce navigateur</b> (entrée <code>twelve_api_key</code>), sur cet ordinateur uniquement. « Effacer » la supprime.</li>
+            <li>Option : vous pouvez aussi la coller dans le fichier HTML, dans la constante <code>DEFAULT_API_KEY</code> (début du script). Attention à ne pas partager le fichier ensuite.</li>
+            <li>Plan gratuit : 8 requêtes/min. Une actualisation utilise 6 requêtes (une par timeframe).</li>
+        </ul>
+    </div>
+
+    <!-- SIGNAL GLOBAL -->
+    <div class="card rounded-xl p-6 mb-6">
+        <h2 class="text-xl font-bold mb-4">Signal Global</h2>
+        <div id="globalSignal" class="text-4xl font-bold text-center text-slate-400">EN ATTENTE</div>
 
         <div class="mt-4">
-
-            <div class="flex justify-between mb-2">
-                <span>Confiance</span>
-                <span id="confidenceText">
-                    0%
-                </span>
+            <div class="flex justify-between mb-2 text-sm">
+                <span>Score (0 = vendeur, 100 = acheteur)</span>
+                <span id="confidenceText">0%</span>
             </div>
-
-            <div class="bg-slate-800 h-4 rounded-full overflow-hidden">
-
-                <div
-                    id="confidenceBar"
-                    class="bg-green-500 h-4"
-                    style="width:0%">
-                </div>
-
+            <div class="bg-slate-800 h-4 rounded-full overflow-hidden relative">
+                <div id="confidenceBar" class="h-4 bg-slate-500 transition-all duration-500" style="width:0%"></div>
+                <div class="absolute top-0 left-[40%] h-4 w-px bg-slate-500"></div>
+                <div class="absolute top-0 left-[60%] h-4 w-px bg-slate-500"></div>
             </div>
-
         </div>
 
+        <div id="summaryStats" class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 text-sm"></div>
+        <p id="verdict" class="mt-4 text-sm text-slate-300"></p>
+    </div>
+
+    <!-- CONFIRMATIONS -->
+    <div class="card rounded-xl p-6 mb-6">
+        <h2 class="text-xl font-bold mb-4">Checklist de confirmation</h2>
+        <div id="confirmations"><span class="text-slate-500">En attente de données...</span></div>
+    </div>
+
+    <!-- OPTIONS -->
+    <div class="card rounded-xl p-6 mb-6">
+        <h2 class="text-xl font-bold mb-4">Options d'analyse</h2>
+
+        <div class="grid md:grid-cols-3 gap-4 mb-4">
+            <div>
+                <label for="profile" class="block text-sm mb-1">Profil (poids des timeframes)</label>
+                <select id="profile" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"></select>
+            </div>
+            <div>
+                <label for="atrTf" class="block text-sm mb-1">Timeframe pour ATR / plan de trade</label>
+                <select id="atrTf" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2"></select>
+            </div>
+            <div>
+                <label for="slMult" class="block text-sm mb-1">Stop-loss (× ATR)</label>
+                <input id="slMult" type="number" min="0.5" max="5" step="0.1"
+                    class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+            </div>
+            <div>
+                <label for="capital" class="block text-sm mb-1">Capital ($)</label>
+                <input id="capital" type="number" min="100" step="100"
+                    class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+            </div>
+            <div>
+                <label for="riskPct" class="block text-sm mb-1">Risque par trade (%)</label>
+                <input id="riskPct" type="number" min="0.1" max="10" step="0.1"
+                    class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2">
+            </div>
+        </div>
+
+        <div class="text-sm mb-2">Indicateurs inclus dans le score :</div>
+        <div id="indicatorToggles" class="flex flex-wrap gap-x-5 gap-y-2 text-sm"></div>
+        <p class="text-xs text-slate-400 mt-3">Les changements s'appliquent immédiatement, sans nouvelle requête API.</p>
     </div>
 
     <!-- HEATMAP -->
-
-    <div class="card rounded-xl p-6">
-
-        <div class="flex justify-between items-center mb-4">
-
-            <h2 class="text-xl font-bold">
-                Heatmap Multi Timeframe
-            </h2>
-
-            <button
-                onclick="loadHeatmap()"
-                class="bg-amber-500 text-black px-4 py-2 rounded font-bold">
-
-                Actualiser
-
-            </button>
-
+    <div class="card rounded-xl p-6 mb-6">
+        <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+            <h2 class="text-xl font-bold">Heatmap Multi Timeframe</h2>
+            <div class="flex items-center gap-4">
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                    <input id="autoRefresh" type="checkbox" class="accent-amber-500">
+                    Auto (60 s)
+                </label>
+                <button id="refreshBtn" type="button"
+                    class="bg-amber-500 text-black px-4 py-2 rounded font-bold flex items-center gap-2 disabled:opacity-60">
+                    <span id="spinner" class="hidden spin">⟳</span>
+                    <span>Actualiser</span>
+                </button>
+            </div>
         </div>
 
-        <table class="w-full">
+        <div id="status" class="hidden mb-4 text-sm rounded px-3 py-2"></div>
 
-            <thead>
-
-            <tr class="border-b border-slate-700">
-
-                <th class="text-left p-3">TF</th>
-                <th class="p-3">RSI</th>
-                <th class="p-3">Signal</th>
-                <th class="p-3">Score</th>
-
-            </tr>
-
-            </thead>
-
-            <tbody id="heatmapBody">
-
-            </tbody>
-
-        </table>
-
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-slate-700 text-slate-300">
+                        <th class="text-left p-3">TF</th>
+                        <th class="p-3">Tendance</th>
+                        <th class="p-3">Signal</th>
+                        <th class="p-3">ATR</th>
+                        <th class="p-3 min-w-[180px]">Score</th>
+                    </tr>
+                </thead>
+                <tbody id="heatmapBody"></tbody>
+            </table>
+        </div>
     </div>
 
+    <!-- MATRICE INDICATEURS -->
+    <div class="card rounded-xl p-6 mb-6">
+        <h2 class="text-xl font-bold mb-4">Détail par indicateur</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm" id="matrix"></table>
+        </div>
+        <p class="text-xs text-slate-400 mt-3">
+            Couleur : rouge = vendeur, jaune = neutre, vert = acheteur. Les lignes grisées sont exclues du score.
+        </p>
+    </div>
+
+    <!-- NIVEAUX + PLAN -->
+    <div class="grid md:grid-cols-2 gap-6 mb-6">
+        <div class="card rounded-xl p-6">
+            <h2 class="text-xl font-bold mb-4">Niveaux clés</h2>
+            <div id="levels" class="text-sm space-y-1"></div>
+            <p class="text-xs text-slate-400 mt-3">
+                Pivots classiques sur la dernière bougie D1 clôturée, extrêmes des 50 dernières bougies, EMA 200 et retracements de Fibonacci (violet) du swing H4.
+            </p>
+        </div>
+
+        <div class="card rounded-xl p-6">
+            <h2 class="text-xl font-bold mb-4">Plan de trade indicatif</h2>
+            <div id="plan" class="text-sm space-y-2"></div>
+            <p class="text-xs text-slate-400 mt-3">
+                Basé sur l'ATR et le signal global. Outil informatif, pas un conseil financier.
+            </p>
+        </div>
+    </div>
 </div>
 
 <script>
+// Option : collez votre clé ici (sinon utilisez le champ + « Sauver »).
+const DEFAULT_API_KEY = "";
 
 const SYMBOL = "XAU/USD";
+const KEY_STORAGE = "twelve_api_key";
+const AUTO_STORAGE = "twelve_auto";
+const SETTINGS_STORAGE = "xau_settings";
+const OUTPUT_SIZE = 300;
 
 const TIMEFRAMES = [
-    {label:"M1", interval:"1min"},
-    {label:"M5", interval:"5min"},
-    {label:"M15", interval:"15min"},
-    {label:"H1", interval:"1h"},
-    {label:"H4", interval:"4h"},
-    {label:"D1", interval:"1day"}
+    { label: "M1",  interval: "1min"  },
+    { label: "M5",  interval: "5min"  },
+    { label: "M15", interval: "15min" },
+    { label: "H1",  interval: "1h"    },
+    { label: "H4",  interval: "4h"    },
+    { label: "D1",  interval: "1day"  }
 ];
 
-function saveKey(){
-
-    localStorage.setItem(
-        "twelve_api_key",
-        document.getElementById("apiKey").value
-    );
-
-    alert("Clé sauvegardée");
-}
-
-window.onload = () => {
-
-    const key =
-        localStorage.getItem("twelve_api_key");
-
-    if(key)
-        document.getElementById("apiKey").value = key;
-
-    loadHeatmap();
+const PROFILES = {
+    balanced: { name: "Équilibré",             weights: [1, 2, 3, 4, 5, 6] },
+    scalping: { name: "Scalping (M1-M15)",     weights: [3, 4, 4, 2, 1, 0.5] },
+    intraday: { name: "Intraday (M15-H4)",     weights: [0.5, 1, 3, 4, 3, 1.5] },
+    swing:    { name: "Swing (H4-D1)",         weights: [0, 0, 1, 2, 4, 5] }
 };
 
-function getSignal(rsi){
+const $ = id => document.getElementById(id);
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-    if(rsi >= 60)
-        return "BUY";
+/* ---------- Indicateurs ---------- */
 
-    if(rsi <= 40)
-        return "SELL";
-
-    return "NEUTRAL";
+function sma(values, period) {
+    if (values.length < period) return null;
+    const s = values.slice(-period);
+    return s.reduce((a, b) => a + b, 0) / period;
 }
 
-function getScore(rsi){
-
-    return Math.round(rsi);
+function ema(values, period) {
+    if (values.length < period) return values.map(() => null);
+    const k = 2 / (period + 1);
+    const out = [];
+    let prev = values.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    for (let i = 0; i < values.length; i++) {
+        if (i < period - 1) { out.push(null); continue; }
+        if (i === period - 1) { out.push(prev); continue; }
+        prev = values[i] * k + prev * (1 - k);
+        out.push(prev);
+    }
+    return out;
 }
 
-function getColor(score){
-
-    if(score >= 60)
-        return "text-green-500";
-
-    if(score <= 40)
-        return "text-red-500";
-
-    return "text-yellow-400";
+function rsi(values, period = 14) {
+    if (values.length <= period) return null;
+    let gain = 0, loss = 0;
+    for (let i = 1; i <= period; i++) {
+        const d = values[i] - values[i - 1];
+        if (d >= 0) gain += d; else loss -= d;
+    }
+    gain /= period; loss /= period;
+    for (let i = period + 1; i < values.length; i++) {
+        const d = values[i] - values[i - 1];
+        gain = (gain * (period - 1) + Math.max(d, 0)) / period;
+        loss = (loss * (period - 1) + Math.max(-d, 0)) / period;
+    }
+    return loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
 }
 
-async function loadHeatmap(){
+function macdHistogram(values) {
+    if (values.length < 40) return null;
+    const e12 = ema(values, 12);
+    const e26 = ema(values, 26);
+    const line = [];
+    for (let i = 0; i < values.length; i++) {
+        if (e12[i] !== null && e26[i] !== null) line.push(e12[i] - e26[i]);
+    }
+    const sig = ema(line, 9).at(-1);
+    return sig == null ? null : line.at(-1) - sig;
+}
 
-    const apiKey =
-        document.getElementById("apiKey").value.trim();
-
-    if(!apiKey)
-        return;
-
-    const body =
-        document.getElementById("heatmapBody");
-
-    body.innerHTML = "";
-
-    let scores = [];
-
-    for(const tf of TIMEFRAMES){
-
-        try{
-
-            const url =
-                `https://api.twelvedata.com/rsi?symbol=${encodeURIComponent(SYMBOL)}&interval=${tf.interval}&apikey=${apiKey}`;
-
-            const response = await fetch(url);
-            const data = await response.json();
-
-            const rsi =
-                parseFloat(data.value);
-
-            if(isNaN(rsi))
-                continue;
-
-            const signal =
-                getSignal(rsi);
-
-            const score =
-                getScore(rsi);
-
-            scores.push(score);
-
-            body.innerHTML += `
-
-            <tr class="border-b border-slate-800">
-
-                <td class="p-3 font-bold">
-                    ${tf.label}
-                </td>
-
-                <td class="p-3 text-center">
-                    ${rsi.toFixed(2)}
-                </td>
-
-                <td class="p-3 text-center ${getColor(score)} font-bold">
-                    ${signal}
-                </td>
-
-                <td class="p-3">
-
-                    <div class="flex items-center gap-3">
-
-                        <div class="flex-1 bg-slate-800 rounded h-3 overflow-hidden">
-
-                            <div
-                                class="bg-green-500 h-3"
-                                style="width:${score}%">
-                            </div>
-
-                        </div>
-
-                        <span>
-                            ${score}%
-                        </span>
-
-                    </div>
-
-                </td>
-
-            </tr>
-
-            `;
-
+// ADX / DI / ATR (lissage de Wilder)
+function adxAtr(h, l, c, p = 14) {
+    const m = h.length - 1;
+    if (m < 2 * p) return null;
+    const tr = [], pdm = [], mdm = [];
+    for (let i = 1; i <= m; i++) {
+        const up = h[i] - h[i - 1];
+        const dn = l[i - 1] - l[i];
+        pdm.push(up > dn && up > 0 ? up : 0);
+        mdm.push(dn > up && dn > 0 ? dn : 0);
+        tr.push(Math.max(h[i] - l[i], Math.abs(h[i] - c[i - 1]), Math.abs(l[i] - c[i - 1])));
+    }
+    const sum = (a) => a.slice(0, p).reduce((x, y) => x + y, 0);
+    let sTr = sum(tr), sP = sum(pdm), sM = sum(mdm);
+    const dxs = [];
+    let pdi = 0, mdi = 0;
+    for (let i = p - 1; i < m; i++) {
+        if (i >= p) {
+            sTr = sTr - sTr / p + tr[i];
+            sP = sP - sP / p + pdm[i];
+            sM = sM - sM / p + mdm[i];
         }
-        catch(error){
+        pdi = 100 * sP / sTr;
+        mdi = 100 * sM / sTr;
+        dxs.push(pdi + mdi === 0 ? 0 : 100 * Math.abs(pdi - mdi) / (pdi + mdi));
+    }
+    let adx = dxs.slice(0, p).reduce((x, y) => x + y, 0) / Math.min(p, dxs.length);
+    for (let i = p; i < dxs.length; i++) adx = (adx * (p - 1) + dxs[i]) / p;
+    return { adx, pdi, mdi, atr: sTr / p };
+}
 
-            console.error(error);
+function stochastic(h, l, c, p = 14) {
+    if (c.length < p + 5) return null;
+    const raw = [];
+    for (let i = p - 1; i < c.length; i++) {
+        const hh = Math.max(...h.slice(i - p + 1, i + 1));
+        const ll = Math.min(...l.slice(i - p + 1, i + 1));
+        raw.push(hh === ll ? 50 : (c[i] - ll) / (hh - ll) * 100);
+    }
+    const k = [];
+    for (let i = 2; i < raw.length; i++) k.push((raw[i] + raw[i - 1] + raw[i - 2]) / 3);
+    return { k: k.at(-1), d: sma(k, 3) };
+}
 
+function cci(h, l, c, p = 20) {
+    if (c.length < p) return null;
+    const tp = c.map((_, i) => (h[i] + l[i] + c[i]) / 3).slice(-p);
+    const mean = tp.reduce((a, b) => a + b, 0) / p;
+    const md = tp.reduce((a, b) => a + Math.abs(b - mean), 0) / p;
+    return md === 0 ? 0 : (tp.at(-1) - mean) / (0.015 * md);
+}
+
+function bollinger(c, p = 20) {
+    if (c.length < p) return null;
+    const s = c.slice(-p);
+    const mean = s.reduce((a, b) => a + b, 0) / p;
+    const sd = Math.sqrt(s.reduce((a, b) => a + (b - mean) ** 2, 0) / p);
+    const upper = mean + 2 * sd, lower = mean - 2 * sd;
+    return { pctB: upper === lower ? 0.5 : (c.at(-1) - lower) / (upper - lower), upper, lower, mid: mean };
+}
+
+function rsiSeries(values, period = 14) {
+    const out = new Array(values.length).fill(null);
+    if (values.length <= period) return out;
+    let gain = 0, loss = 0;
+    for (let i = 1; i <= period; i++) {
+        const d = values[i] - values[i - 1];
+        if (d >= 0) gain += d; else loss -= d;
+    }
+    gain /= period; loss /= period;
+    out[period] = loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
+    for (let i = period + 1; i < values.length; i++) {
+        const d = values[i] - values[i - 1];
+        gain = (gain * (period - 1) + Math.max(d, 0)) / period;
+        loss = (loss * (period - 1) + Math.max(-d, 0)) / period;
+        out[i] = loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
+    }
+    return out;
+}
+
+function supertrend(h, l, c, p = 10, m = 3) {
+    const n = c.length;
+    if (n < p + 2) return null;
+    const tr = [h[0] - l[0]];
+    for (let i = 1; i < n; i++) tr.push(Math.max(h[i] - l[i], Math.abs(h[i] - c[i - 1]), Math.abs(l[i] - c[i - 1])));
+    const atr = new Array(n).fill(null);
+    let a = tr.slice(0, p).reduce((x, y) => x + y, 0) / p;
+    atr[p - 1] = a;
+    for (let i = p; i < n; i++) { a = (a * (p - 1) + tr[i]) / p; atr[i] = a; }
+
+    let fu = null, fl = null, dir = 1, value = null;
+    for (let i = p - 1; i < n; i++) {
+        const hl2 = (h[i] + l[i]) / 2;
+        const bu = hl2 + m * atr[i], bl = hl2 - m * atr[i];
+        if (fu === null) { fu = bu; fl = bl; dir = c[i] >= hl2 ? 1 : -1; }
+        else {
+            fu = (bu < fu || c[i - 1] > fu) ? bu : fu;
+            fl = (bl > fl || c[i - 1] < fl) ? bl : fl;
+            if (dir === 1 && c[i] < fl) dir = -1;
+            else if (dir === -1 && c[i] > fu) dir = 1;
         }
+        value = dir === 1 ? fl : fu;
+    }
+    return { dir, value };
+}
+
+function ichimoku(h, l, c) {
+    const n = c.length;
+    if (n < 78) return null;
+    const mid = (end, p) => (Math.max(...h.slice(end - p + 1, end + 1)) + Math.min(...l.slice(end - p + 1, end + 1))) / 2;
+    const last = n - 1, idx = last - 26;
+    const spanA = (mid(idx, 9) + mid(idx, 26)) / 2, spanB = mid(idx, 52);
+    return { tenkan: mid(last, 9), kijun: mid(last, 26), spanA, spanB, top: Math.max(spanA, spanB), bottom: Math.min(spanA, spanB) };
+}
+
+function heikinAshi(candles) {
+    let haO = (candles[0].o + candles[0].c) / 2;
+    let haC = (candles[0].o + candles[0].h + candles[0].l + candles[0].c) / 4;
+    const out = [];
+    for (let i = 1; i < candles.length; i++) {
+        const k = candles[i];
+        const nc = (k.o + k.h + k.l + k.c) / 4, no = (haO + haC) / 2;
+        haO = no; haC = nc;
+        out.push({ o: no, c: nc, h: Math.max(k.h, no, nc), l: Math.min(k.l, no, nc) });
+    }
+    return out;
+}
+
+function linreg(c, p = 20) {
+    const y = c.slice(-p), mx = (p - 1) / 2, my = y.reduce((a, b) => a + b, 0) / p;
+    let sxy = 0, sxx = 0, syy = 0;
+    y.forEach((v, i) => { sxy += (i - mx) * (v - my); sxx += (i - mx) ** 2; syy += (v - my) ** 2; });
+    return { slope: sxy / sxx, r2: syy === 0 ? 0 : (sxy * sxy) / (sxx * syy) };
+}
+
+// Motifs sur les dernières bougies CLÔTURÉES (la dernière bougie est encore en formation)
+function candlePattern(cs) {
+    if (cs.length < 6) return null;
+    const k = cs.at(-2), p = cs.at(-3), q = cs.at(-4);
+    const body = x => Math.abs(x.c - x.o), range = x => (x.h - x.l) || 1e-9;
+    const up = x => x.c > x.o, dn = x => x.c < x.o;
+    const upper = x => x.h - Math.max(x.o, x.c), lower = x => Math.min(x.o, x.c) - x.l;
+
+    if (dn(p) && up(k) && k.c >= p.o && k.o <= p.c && body(k) > body(p)) return { name: "Engulfing haussier", bias: 1 };
+    if (up(p) && dn(k) && k.c <= p.o && k.o >= p.c && body(k) > body(p)) return { name: "Engulfing baissier", bias: -1 };
+    if (dn(q) && body(p) < 0.3 * body(q) && up(k) && k.c > (q.o + q.c) / 2) return { name: "Étoile du matin", bias: 1 };
+    if (up(q) && body(p) < 0.3 * body(q) && dn(k) && k.c < (q.o + q.c) / 2) return { name: "Étoile du soir", bias: -1 };
+    if (body(k) / range(k) < 0.4 && lower(k) >= 2 * body(k) && upper(k) <= 0.25 * range(k) && p.c < q.c) return { name: "Marteau", bias: 1 };
+    if (body(k) / range(k) < 0.4 && upper(k) >= 2 * body(k) && lower(k) <= 0.25 * range(k) && p.c > q.c) return { name: "Étoile filante", bias: -1 };
+    if (body(k) / range(k) < 0.1) return { name: "Doji", bias: 0 };
+    return { name: "-", bias: 0 };
+}
+
+// +1 divergence haussière récente, -1 baissière, 0 aucune
+function rsiDivergence(c, h, l) {
+    const n = c.length, r = rsiSeries(c), start = Math.max(20, n - 60);
+    const lows = [], highs = [];
+    for (let i = start; i < n - 3; i++) {
+        if (r[i] === null) continue;
+        let isL = true, isH = true;
+        for (let j = 1; j <= 3; j++) {
+            if (l[i] >= l[i - j] || l[i] >= l[i + j]) isL = false;
+            if (h[i] <= h[i - j] || h[i] <= h[i + j]) isH = false;
+        }
+        if (isL) lows.push(i);
+        if (isH) highs.push(i);
+    }
+    const recent = i => n - 1 - i <= 25;
+    if (lows.length >= 2) {
+        const a = lows.at(-2), b = lows.at(-1);
+        if (recent(b) && l[b] < l[a] && r[b] > r[a] + 2) return 1;
+    }
+    if (highs.length >= 2) {
+        const a = highs.at(-2), b = highs.at(-1);
+        if (recent(b) && h[b] > h[a] && r[b] < r[a] - 2) return -1;
+    }
+    return 0;
+}
+
+function analyse(candles) {
+    const c = candles.map(x => x.c), h = candles.map(x => x.h), l = candles.map(x => x.l);
+    if (c.length < 60) return null;
+    const price = c.at(-1);
+    const aa = adxAtr(h, l, c);
+    const e200 = c.length >= 200 ? ema(c, 200).at(-1) : null;
+    const e20 = ema(c, 20).at(-1);
+    const a = {
+        price,
+        rsi: rsi(c),
+        e20,
+        e50: ema(c, 50).at(-1),
+        e200,
+        hist: macdHistogram(c),
+        stoch: stochastic(h, l, c),
+        cci: cci(h, l, c),
+        boll: bollinger(c),
+        adx: aa,
+        atr: aa ? aa.atr : null,
+        swingHi: Math.max(...h.slice(-50)),
+        swingLo: Math.min(...l.slice(-50)),
+        prev: candles.length >= 2 ? candles.at(-2) : null
+    };
+    if (a.rsi === null || a.e20 == null || a.e50 == null || a.hist === null || !a.atr) return null;
+
+    a.st = supertrend(h, l, c);
+    a.ich = ichimoku(h, l, c);
+    a.ha = heikinAshi(candles).slice(-5);
+    a.lr = linreg(c);
+    a.roc = c.length > 13 ? (price - c.at(-13)) / a.atr : null;
+    a.rocPct = c.length > 13 ? (price / c.at(-13) - 1) * 100 : null;
+    a.candle = candlePattern(candles);
+    a.div = rsiDivergence(c, h, l);
+    a.squeeze = a.boll ? (a.boll.upper < e20 + 1.5 * a.atr && a.boll.lower > e20 - 1.5 * a.atr) : null;
+    return a;
+}
+
+/* ---------- Définition des indicateurs et scores ---------- */
+
+const INDICATORS = [
+    { id: "rsi", label: "RSI 14", weight: 4,
+      calc: a => ({ score: a.rsi, text: a.rsi.toFixed(1) }) },
+    { id: "ema", label: "EMA 20/50", weight: 3,
+      calc: a => {
+          const d = clamp(((a.e20 - a.e50) / a.price) * 400, -1, 1);
+          return { score: 50 + d * 40, text: (a.e20 > a.e50 ? "▲ " : "▼ ") + (a.e20 - a.e50).toFixed(2) };
+      } },
+    { id: "ema200", label: "Prix vs EMA 200", weight: 3,
+      calc: a => {
+          if (a.e200 == null) return null;
+          const x = clamp((a.price - a.e200) / a.atr, -6, 6);
+          return { score: 50 + x * (40 / 6), text: (a.price > a.e200 ? "▲ " : "▼ ") + (a.price - a.e200).toFixed(1) };
+      } },
+    { id: "macd", label: "MACD (12,26,9)", weight: 3,
+      calc: a => {
+          const n = clamp((a.hist / a.price) * 2500, -1, 1);
+          return { score: 50 + n * 40, text: (a.hist >= 0 ? "▲ " : "▼ ") + a.hist.toFixed(3) };
+      } },
+    { id: "stoch", label: "Stochastique 14,3,3", weight: 2,
+      calc: a => a.stoch ? { score: a.stoch.k, text: `${a.stoch.k.toFixed(0)} / ${a.stoch.d.toFixed(0)}` } : null },
+    { id: "cci", label: "CCI 20", weight: 2,
+      calc: a => a.cci == null ? null : { score: 50 + clamp(a.cci, -200, 200) / 4, text: a.cci.toFixed(0) } },
+    { id: "adx", label: "ADX / DI 14", weight: 2,
+      calc: a => {
+          if (!a.adx) return null;
+          const { adx, pdi, mdi } = a.adx;
+          const dir = (pdi - mdi) / (pdi + mdi || 1);
+          return { score: 50 + dir * 50 * clamp(adx / 40, 0, 1), text: `${adx.toFixed(0)} ${pdi > mdi ? "+DI" : "-DI"}` };
+      } },
+    { id: "boll", label: "Bollinger %B (20,2)", weight: 1,
+      calc: a => a.boll ? { score: clamp(a.boll.pctB * 100, 0, 100), text: (a.boll.pctB * 100).toFixed(0) + "%" } : null },
+    { id: "cross", label: "EMA 50 / 200", weight: 2,
+      calc: a => {
+          if (a.e200 == null) return null;
+          const x = clamp((a.e50 - a.e200) / a.atr, -6, 6);
+          return { score: 50 + x * (40 / 6), text: (a.e50 > a.e200 ? "Golden " : "Death ") + (a.e50 - a.e200).toFixed(1) };
+      } },
+    { id: "st", label: "Supertrend (10,3)", weight: 3,
+      calc: a => {
+          if (!a.st) return null;
+          const x = clamp(Math.abs(a.price - a.st.value) / a.atr / 3, 0.25, 1);
+          return { score: 50 + a.st.dir * x * 40, text: (a.st.dir > 0 ? "▲ " : "▼ ") + fmt(a.st.value) };
+      } },
+    { id: "ich", label: "Ichimoku (9,26,52)", weight: 3,
+      calc: a => {
+          if (!a.ich) return null;
+          const i = a.ich;
+          const cloud = a.price > i.top ? 1 : a.price < i.bottom ? -1 : 0;
+          const sum = cloud + (i.tenkan > i.kijun ? 1 : -1) + (a.price > i.kijun ? 1 : -1) + (i.spanA > i.spanB ? 1 : -1);
+          const label = cloud > 0 ? "Sur nuage" : cloud < 0 ? "Sous nuage" : "Dans nuage";
+          return { score: 50 + (sum / 4) * 45, text: `${cloud > 0 ? "▲" : cloud < 0 ? "▼" : "◆"} ${label}` };
+      } },
+    { id: "roc", label: "Momentum ROC 12", weight: 2,
+      calc: a => a.roc == null ? null : { score: 50 + clamp(a.roc / 4, -1, 1) * 40, text: `${a.rocPct >= 0 ? "▲" : "▼"} ${a.rocPct.toFixed(2)}%` } },
+    { id: "lr", label: "Régression linéaire 20", weight: 2,
+      calc: a => {
+          const rise = a.lr.slope * 19 / a.atr;
+          return { score: 50 + clamp(rise / 4, -1, 1) * 40 * (0.5 + 0.5 * a.lr.r2), text: `${a.lr.slope >= 0 ? "▲" : "▼"} R² ${a.lr.r2.toFixed(2)}` };
+      } },
+    { id: "ha", label: "Heikin Ashi (5)", weight: 1,
+      calc: a => {
+          const bulls = a.ha.filter(x => x.c > x.o).length, bears = a.ha.length - bulls;
+          return { score: 50 + ((bulls - bears) / a.ha.length) * 40, text: `${bulls}▲ ${bears}▼` };
+      } },
+    { id: "candle", label: "Bougie (dernière clôturée)", weight: 1,
+      calc: a => a.candle ? { score: 50 + a.candle.bias * 25, text: a.candle.name } : null },
+    { id: "div", label: "Divergence RSI", weight: 2,
+      calc: a => ({ score: 50 + a.div * 25, text: a.div > 0 ? "Haussière" : a.div < 0 ? "Baissière" : "-" }) }
+];
+
+function defaultSettings() {
+    return {
+        profile: "balanced",
+        atrTf: "1h",
+        slMult: 1.5,
+        capital: 10000,
+        riskPct: 1,
+        enabled: Object.fromEntries(INDICATORS.map(i => [i.id, true]))
+    };
+}
+
+function loadSettings() {
+    const d = defaultSettings();
+    try {
+        const s = JSON.parse(localStorage.getItem(SETTINGS_STORAGE) || "{}");
+        return { ...d, ...s, enabled: { ...d.enabled, ...(s.enabled || {}) } };
+    } catch { return d; }
+}
+
+const state = {
+    settings: loadSettings(),
+    data: {},        // interval -> { a } | { error }
+    loading: false,
+    autoTimer: null
+};
+
+function saveSettings() {
+    localStorage.setItem(SETTINGS_STORAGE, JSON.stringify(state.settings));
+}
+
+function tfScore(a) {
+    let sum = 0, w = 0;
+    for (const ind of INDICATORS) {
+        if (!state.settings.enabled[ind.id]) continue;
+        const r = ind.calc(a);
+        if (!r) continue;
+        sum += clamp(r.score, 0, 100) * ind.weight;
+        w += ind.weight;
+    }
+    return w ? Math.round(sum / w) : null;
+}
+
+/* ---------- Helpers d'affichage ---------- */
+
+function signalOf(score) {
+    if (score >= 70) return { text: "STRONG BUY", cls: "text-green-400", bg: "bg-green-500" };
+    if (score >= 60) return { text: "BUY", cls: "text-green-500", bg: "bg-green-500" };
+    if (score <= 30) return { text: "STRONG SELL", cls: "text-red-400", bg: "bg-red-500" };
+    if (score <= 40) return { text: "SELL", cls: "text-red-500", bg: "bg-red-500" };
+    return { text: "NEUTRAL", cls: "text-yellow-400", bg: "bg-yellow-500" };
+}
+
+function cellColor(score) {
+    const hue = Math.round((clamp(score, 0, 100) / 100) * 120);
+    return `background:hsla(${hue},70%,40%,.35);color:hsl(${hue},80%,70%)`;
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function fmt(n, d = 2) { return Number(n).toFixed(d); }
+
+function showStatus(msg, type = "info") {
+    const el = $("status");
+    if (!msg) { el.classList.add("hidden"); return; }
+    const colors = {
+        info: "bg-blue-900/40 text-blue-200",
+        error: "bg-red-900/40 text-red-200",
+        warn: "bg-yellow-900/40 text-yellow-200"
+    };
+    el.className = `mb-4 text-sm rounded px-3 py-2 ${colors[type]}`;
+    el.textContent = msg;
+}
+
+function trendLabel(score) {
+    if (score >= 65) return { t: "Haussière", cls: "text-green-500" };
+    if (score <= 35) return { t: "Baissière", cls: "text-red-500" };
+    return { t: "Range / mixte", cls: "text-yellow-400" };
+}
+
+/* ---------- Rendu ---------- */
+
+function renderSessions() {
+    const now = new Date();
+    const h = now.getUTCHours() + now.getUTCMinutes() / 60;
+    const sessions = [
+        { name: "Asie", from: 0, to: 8 },
+        { name: "Londres", from: 7, to: 16 },
+        { name: "New York", from: 12, to: 21 }
+    ];
+    const active = sessions.filter(s => h >= s.from && h < s.to);
+    const overlap = h >= 12 && h < 16;
+    $("sessions").innerHTML = sessions.map(s => {
+        const on = active.includes(s);
+        return `<span class="px-2 py-1 rounded ${on ? "bg-green-900/50 text-green-300" : "bg-slate-800 text-slate-500"}">${s.name}${on ? " • ouverte" : ""}</span>`;
+    }).join("") + (overlap ? `<span class="px-2 py-1 rounded bg-amber-900/50 text-amber-300">Chevauchement Londres/NY : volatilité maximale</span>` : "");
+}
+
+function renderSummaryTable() {
+    const rows = TIMEFRAMES.map(tf => {
+        const d = state.data[tf.interval];
+        if (!d) return `<tr class="border-b border-slate-800 text-slate-500"><td class="p-3 font-bold">${tf.label}</td><td colspan="4" class="p-3">${state.loading ? "En attente..." : "-"}</td></tr>`;
+        if (d.error) return `<tr class="border-b border-slate-800"><td class="p-3 font-bold">${tf.label}</td><td colspan="4" class="p-3 text-red-400">${escapeHtml(d.error)}</td></tr>`;
+        const score = tfScore(d.a);
+        if (score === null) return `<tr class="border-b border-slate-800"><td class="p-3 font-bold">${tf.label}</td><td colspan="4" class="p-3 text-slate-400">Aucun indicateur actif</td></tr>`;
+        const sig = signalOf(score), tr = trendLabel(score);
+        return `
+        <tr class="border-b border-slate-800">
+            <td class="p-3 font-bold">${tf.label}</td>
+            <td class="p-3 text-center font-bold ${tr.cls}">${tr.t}</td>
+            <td class="p-3 text-center font-bold ${sig.cls}">${sig.text}</td>
+            <td class="p-3 text-center text-slate-300">${fmt(d.a.atr)} <span class="text-xs text-slate-500">(${fmt(d.a.atr / d.a.price * 100)}%)</span></td>
+            <td class="p-3">
+                <div class="flex items-center gap-3">
+                    <div class="flex-1 bg-slate-800 rounded h-3 overflow-hidden"><div class="${sig.bg} h-3" style="width:${score}%"></div></div>
+                    <span class="w-10 text-right">${score}%</span>
+                </div>
+            </td>
+        </tr>`;
+    });
+    $("heatmapBody").innerHTML = rows.join("");
+}
+
+function renderMatrix() {
+    const head = `<thead><tr class="border-b border-slate-700 text-slate-300">
+        <th class="text-left p-2">Indicateur</th>${TIMEFRAMES.map(t => `<th class="p-2">${t.label}</th>`).join("")}</tr></thead>`;
+
+    const body = INDICATORS.map(ind => {
+        const on = state.settings.enabled[ind.id];
+        const cells = TIMEFRAMES.map(tf => {
+            const d = state.data[tf.interval];
+            if (!d || d.error) return `<td class="p-2 text-center text-slate-600">-</td>`;
+            const r = ind.calc(d.a);
+            if (!r) return `<td class="p-2 text-center text-slate-600">n/a</td>`;
+            return `<td class="p-2"><div class="cell" style="${cellColor(r.score)}">${r.text}</div></td>`;
+        }).join("");
+        return `<tr class="border-b border-slate-800 ${on ? "" : "opacity-40"}"><td class="p-2 font-semibold">${ind.label}</td>${cells}</tr>`;
+    }).join("");
+
+    const atrRow = `<tr class="border-b border-slate-800"><td class="p-2 font-semibold">ATR 14 (volatilité)</td>${
+        TIMEFRAMES.map(tf => {
+            const d = state.data[tf.interval];
+            return (!d || d.error) ? `<td class="p-2 text-center text-slate-600">-</td>`
+                : `<td class="p-2 text-center text-slate-300">${fmt(d.a.atr)}</td>`;
+        }).join("")}</tr>`;
+
+    const squeezeRow = `<tr class="border-b border-slate-800"><td class="p-2 font-semibold">Squeeze (BB dans Keltner)</td>${
+        TIMEFRAMES.map(tf => {
+            const d = state.data[tf.interval];
+            if (!d || d.error || d.a.squeeze === null) return `<td class="p-2 text-center text-slate-600">-</td>`;
+            return d.a.squeeze ? `<td class="p-2 text-center text-amber-400 font-bold">Compression</td>`
+                : `<td class="p-2 text-center text-slate-400">Normal</td>`;
+        }).join("")}</tr>`;
+
+    const scoreRow = `<tr class="border-t-2 border-slate-600"><td class="p-2 font-bold">Score</td>${
+        TIMEFRAMES.map(tf => {
+            const d = state.data[tf.interval];
+            if (!d || d.error) return `<td class="p-2 text-center text-slate-600">-</td>`;
+            const s = tfScore(d.a);
+            return s === null ? `<td class="p-2 text-center text-slate-600">-</td>`
+                : `<td class="p-2"><div class="cell" style="${cellColor(s)}">${s}%</div></td>`;
+        }).join("")}</tr>`;
+
+    $("matrix").innerHTML = head + `<tbody>${body}${atrRow}${squeezeRow}${scoreRow}</tbody>`;
+}
+
+function computeGlobal() {
+    const weights = PROFILES[state.settings.profile].weights;
+    let sum = 0, w = 0, bull = 0, bear = 0, n = 0;
+    TIMEFRAMES.forEach((tf, i) => {
+        const d = state.data[tf.interval];
+        if (!d || d.error) return;
+        const s = tfScore(d.a);
+        if (s === null) return;
+        n++;
+        if (s >= 55) bull++;
+        if (s <= 45) bear++;
+        sum += s * weights[i];
+        w += weights[i];
+    });
+    if (!n || !w) return null;
+    return { score: Math.round(sum / w), bull, bear, n };
+}
+
+function renderGlobal() {
+    const g = computeGlobal();
+    const signalEl = $("globalSignal");
+    const stats = $("summaryStats");
+    if (!g) {
+        signalEl.textContent = "EN ATTENTE";
+        signalEl.className = "text-4xl font-bold text-center text-slate-400";
+        $("confidenceText").textContent = "0%";
+        $("confidenceBar").style.width = "0%";
+        $("confidenceBar").className = "h-4 bg-slate-500 transition-all duration-500";
+        stats.innerHTML = "";
+        $("verdict").textContent = "";
+        return null;
+    }
+    const sig = signalOf(g.score);
+    signalEl.textContent = sig.text;
+    signalEl.className = `text-4xl font-bold text-center ${sig.cls}`;
+    $("confidenceText").textContent = g.score + "%";
+    $("confidenceBar").style.width = g.score + "%";
+    $("confidenceBar").className = `h-4 ${sig.bg} transition-all duration-500`;
+
+    const base = state.data[state.settings.atrTf];
+    const atrInfo = base && base.a ? base.a : null;
+    const adxVals = TIMEFRAMES.map(t => state.data[t.interval]).filter(d => d && d.a && d.a.adx).map(d => d.a.adx.adx);
+    const adxAvg = adxVals.length ? adxVals.reduce((a, b) => a + b, 0) / adxVals.length : null;
+    const regime = adxAvg === null ? "-" : adxAvg >= 25 ? "Tendance" : adxAvg >= 18 ? "Transition" : "Range";
+    const atrPct = atrInfo ? atrInfo.atr / atrInfo.price * 100 : null;
+    const vol = atrPct === null ? "-" : atrPct > 0.5 ? "Élevée" : atrPct > 0.2 ? "Normale" : "Faible";
+
+    const box = (t, v, cls = "") => `<div class="bg-slate-900 rounded-lg p-3"><div class="text-xs text-slate-400">${t}</div><div class="text-lg font-bold ${cls}">${v}</div></div>`;
+    stats.innerHTML =
+        box("TF haussiers", `${g.bull} / ${g.n}`, "text-green-500") +
+        box("TF baissiers", `${g.bear} / ${g.n}`, "text-red-500") +
+        box("Régime de marché (ADX moy.)", adxAvg === null ? "-" : `${regime} (${adxAvg.toFixed(0)})`) +
+        box(`Volatilité ${tfLabel(state.settings.atrTf)}`, atrPct === null ? "-" : `${vol} (${atrPct.toFixed(2)}%)`);
+
+    const align = g.bull === g.n ? "Alignement haussier complet." : g.bear === g.n ? "Alignement baissier complet."
+        : g.bull > g.bear ? "Biais haussier, mais des timeframes divergent." : g.bear > g.bull ? "Biais baissier, mais des timeframes divergent."
+        : "Timeframes partagés : marché indécis.";
+    const rsiH4 = state.data["4h"] && state.data["4h"].a ? state.data["4h"].a.rsi : null;
+    const extra = rsiH4 === null ? "" : rsiH4 >= 70 ? " RSI H4 en surachat : risque de repli." : rsiH4 <= 30 ? " RSI H4 en survente : risque de rebond." : "";
+    $("verdict").textContent = align + extra + (regime === "Range" ? " Marché plutôt en range : privilégier les niveaux plutôt que la tendance." : "");
+    return g;
+}
+
+function tfLabel(interval) {
+    const t = TIMEFRAMES.find(x => x.interval === interval);
+    return t ? t.label : interval;
+}
+
+function getLevels() {
+    const d1 = state.data["1day"];
+    const ref = [d1, state.data["4h"], state.data["1h"], state.data["1min"]].find(d => d && d.a);
+    if (!ref) return null;
+    const price = ref.a.price;
+    const atr = (state.data[state.settings.atrTf] && state.data[state.settings.atrTf].a || ref.a).atr;
+
+    const lv = [];
+    if (d1 && d1.a && d1.a.prev) {
+        const { h, l, c } = d1.a.prev;
+        const p = (h + l + c) / 3;
+        lv.push({ n: "R2 (pivot D1)", v: p + (h - l), k: "r" }, { n: "R1 (pivot D1)", v: 2 * p - l, k: "r" },
+                { n: "Pivot D1", v: p, k: "p" },
+                { n: "S1 (pivot D1)", v: 2 * p - h, k: "s" }, { n: "S2 (pivot D1)", v: p - (h - l), k: "s" },
+                { n: "Plus haut veille", v: h, k: "r" }, { n: "Plus bas veille", v: l, k: "s" });
+    }
+    [["1day", "D1"], ["4h", "H4"], ["1h", "H1"]].forEach(([iv, lb]) => {
+        const d = state.data[iv];
+        if (d && d.a) {
+            lv.push({ n: `Plus haut 50 bougies ${lb}`, v: d.a.swingHi, k: "r" }, { n: `Plus bas 50 bougies ${lb}`, v: d.a.swingLo, k: "s" });
+            if (d.a.e200 != null) lv.push({ n: `EMA 200 ${lb}`, v: d.a.e200, k: "p" });
+        }
+    });
+    const h4 = state.data["4h"];
+    if (h4 && h4.a) {
+        const { swingHi: hi, swingLo: lo } = h4.a;
+        [0.382, 0.5, 0.618].forEach(r => lv.push({ n: `Fibonacci ${(r * 100).toFixed(1)}% (H4)`, v: lo + (hi - lo) * r, k: "f" }));
+    }
+    lv.sort((a, b) => b.v - a.v);
+    return { levels: lv, price, atr };
+}
+
+function renderLevels() {
+    const el = $("levels");
+    const L = getLevels();
+    if (!L) { el.innerHTML = `<span class="text-slate-500">En attente de données...</span>`; return; }
+    const { price, atr } = L;
+    const lv = [...L.levels, { n: "PRIX ACTUEL", v: price, k: "now" }].sort((a, b) => b.v - a.v);
+
+    el.innerHTML = lv.map(x => {
+        const diff = x.v - price;
+        const cls = x.k === "now" ? "bg-amber-500 text-black font-bold" : x.k === "r" ? "text-red-400" : x.k === "s" ? "text-green-400" : x.k === "f" ? "text-purple-300" : "text-slate-300";
+        const dist = x.k === "now" ? "" : `${diff >= 0 ? "+" : ""}${fmt(diff)} (${fmt(Math.abs(diff) / atr, 1)} ATR)`;
+        return `<div class="flex justify-between rounded px-2 py-1 ${cls}"><span>${x.n}</span><span>${fmt(x.v)} <span class="text-xs opacity-70 ml-2">${dist}</span></span></div>`;
+    }).join("");
+}
+
+/* ---------- Confirmations ---------- */
+
+function computeConfirmations(g) {
+    const dir = g.score >= 50 ? 1 : -1;
+    const A = iv => (state.data[iv] && state.data[iv].a) || null;
+    const side = s => s === null ? null : (dir > 0 ? s >= 55 : s <= 45);
+    const scoreOf = iv => A(iv) ? tfScore(A(iv)) : null;
+    const all = (...v) => v.includes(null) ? null : v.every(Boolean);
+    const items = [];
+    const add = (label, ok, detail) => items.push({ label, ok, detail });
+
+    // 1. Alignement général
+    const scores = TIMEFRAMES.map(t => scoreOf(t.interval)).filter(s => s !== null);
+    const agree = scores.filter(s => side(s)).length;
+    add("Alignement multi-timeframe", scores.length ? agree / scores.length >= 0.66 : null, `${agree}/${scores.length} timeframes dans le sens du signal`);
+
+    // 2. Timeframes supérieurs
+    add("Tendance de fond (H4 + D1)", all(side(scoreOf("4h")), side(scoreOf("1day"))),
+        `H4 ${scoreOf("4h") ?? "-"}% • D1 ${scoreOf("1day") ?? "-"}%`);
+
+    // 3. Timeframes d'entrée
+    add("Timeframes d'entrée (M15 + H1)", all(side(scoreOf("15min")), side(scoreOf("1h"))),
+        `M15 ${scoreOf("15min") ?? "-"}% • H1 ${scoreOf("1h") ?? "-"}%`);
+
+    // 4. Force de tendance
+    const h1 = A("1h");
+    add("Force de tendance (ADX H1 ≥ 20 et DI dans le sens)", h1 && h1.adx ? (h1.adx.adx >= 20 && (h1.adx.pdi > h1.adx.mdi) === (dir > 0)) : null,
+        h1 && h1.adx ? `ADX ${h1.adx.adx.toFixed(0)} • ${h1.adx.pdi > h1.adx.mdi ? "+DI" : "-DI"} dominant` : "n/a");
+
+    // 5. Momentum H1
+    add("Momentum H1 (RSI vs 50 et MACD)", h1 ? ((h1.rsi > 50) === (dir > 0) && (h1.hist > 0) === (dir > 0)) : null,
+        h1 ? `RSI ${h1.rsi.toFixed(0)} • MACD ${h1.hist >= 0 ? "positif" : "négatif"}` : "n/a");
+
+    // 6. Supertrend
+    const s1 = A("1h"), s4 = A("4h");
+    add("Supertrend H1 + H4", s1 && s1.st && s4 && s4.st ? (s1.st.dir === dir && s4.st.dir === dir) : null,
+        s1 && s1.st && s4 && s4.st ? `H1 ${s1.st.dir > 0 ? "▲" : "▼"} • H4 ${s4.st.dir > 0 ? "▲" : "▼"}` : "n/a");
+
+    // 7. Ichimoku H4
+    const i4 = s4 && s4.ich ? s4.ich : null;
+    add("Ichimoku H4 : prix hors du nuage dans le bon sens",
+        i4 ? (dir > 0 ? s4.price > i4.top : s4.price < i4.bottom) : null,
+        i4 ? (s4.price > i4.top ? "Au-dessus du nuage" : s4.price < i4.bottom ? "Sous le nuage" : "Dans le nuage") : "n/a");
+
+    // 8. EMA 200
+    add("Prix du bon côté de l'EMA 200 (H4)", s4 && s4.e200 != null ? ((s4.price > s4.e200) === (dir > 0)) : null,
+        s4 && s4.e200 != null ? `${s4.price > s4.e200 ? "Au-dessus" : "Sous"} (${fmt(s4.price - s4.e200, 1)})` : "n/a");
+
+    // 9. Pas de surextension
+    add("Pas de surextension (RSI et Bollinger H1)",
+        h1 && h1.boll ? (dir > 0 ? (h1.rsi < 70 && h1.boll.pctB < 1) : (h1.rsi > 30 && h1.boll.pctB > 0)) : null,
+        h1 && h1.boll ? `RSI ${h1.rsi.toFixed(0)} • %B ${(h1.boll.pctB * 100).toFixed(0)}%` : "n/a");
+
+    // 10. Divergences contraires
+    const dv = [A("1h"), A("4h")].filter(Boolean).map(a => a.div);
+    add("Pas de divergence RSI contraire (H1/H4)", dv.length ? dv.every(d => d !== -dir) : null,
+        dv.length ? (dv.some(d => d === -dir) ? "Divergence contraire détectée" : "Aucune divergence contraire") : "n/a");
+
+    // 11. Bougie de confirmation
+    const cand = [A("15min"), A("1h")].filter(a => a && a.candle && a.candle.bias !== 0);
+    add("Bougie de confirmation (M15/H1)", cand.length ? cand.every(a => a.candle.bias === dir) : null,
+        cand.length ? cand.map(a => a.candle.name).join(", ") : "Aucun motif récent");
+
+    // 12. Volatilité suffisante
+    add("Volatilité suffisante (ATR H1 ≥ 0.15 %)", h1 ? (h1.atr / h1.price * 100 >= 0.15) : null,
+        h1 ? `ATR H1 ${(h1.atr / h1.price * 100).toFixed(2)} %` : "n/a");
+
+    // 13. Session active
+    const hUtc = new Date().getUTCHours() + new Date().getUTCMinutes() / 60;
+    add("Session Londres ou New York ouverte", (hUtc >= 7 && hUtc < 21), (hUtc >= 7 && hUtc < 21) ? "Liquidité élevée" : "Liquidité faible (Asie)");
+
+    // 14. Espace avant le prochain niveau
+    const L = getLevels();
+    if (L) {
+        const ahead = L.levels.filter(x => dir > 0 ? x.v > L.price : x.v < L.price).map(x => ({ ...x, d: Math.abs(x.v - L.price) })).sort((a, b) => a.d - b.d)[0];
+        add("Espace libre ≥ 1 ATR avant le prochain niveau", ahead ? ahead.d / L.atr >= 1 : true,
+            ahead ? `${ahead.n} à ${fmt(ahead.d / L.atr, 1)} ATR` : "Aucun niveau devant");
     }
 
-    updateGlobal(scores);
+    // 15. Squeeze (information)
+    const sq = A("1h");
+    add("Pas de compression H1 (squeeze)", sq && sq.squeeze !== null ? !sq.squeeze : null,
+        sq && sq.squeeze ? "Compression : cassure imminente, direction incertaine" : "Volatilité normale");
+
+    const applicable = items.filter(i => i.ok !== null);
+    const passed = applicable.filter(i => i.ok).length;
+    const pct = applicable.length ? Math.round(passed / applicable.length * 100) : 0;
+    const grade = pct >= 80 ? { l: "A", t: "Forte confirmation", cls: "bg-green-600" }
+        : pct >= 60 ? { l: "B", t: "Confirmation correcte", cls: "bg-lime-600" }
+        : pct >= 40 ? { l: "C", t: "Confirmation faible", cls: "bg-yellow-600" }
+        : { l: "D", t: "Éviter", cls: "bg-red-600" };
+    return { dir, items, passed, total: applicable.length, pct, grade };
 }
 
-function updateGlobal(scores){
+function renderConfirmations(conf, g) {
+    const el = $("confirmations");
+    if (!conf) { el.innerHTML = `<span class="text-slate-500">En attente de données...</span>`; return; }
+    const neutral = g.score > 40 && g.score < 60;
+    const icon = ok => ok === null ? `<span class="text-slate-500">–</span>` : ok ? `<span class="text-green-500">✔</span>` : `<span class="text-red-500">✘</span>`;
+    el.innerHTML = `
+        <div class="flex flex-wrap items-center gap-4 mb-4">
+            <div class="text-4xl font-bold w-16 h-16 rounded-xl flex items-center justify-center text-white ${conf.grade.cls}">${conf.grade.l}</div>
+            <div class="flex-1 min-w-[200px]">
+                <div class="font-bold">${conf.grade.t} pour un scénario <span class="${conf.dir > 0 ? "text-green-500" : "text-red-500"}">${conf.dir > 0 ? "ACHAT" : "VENTE"}</span>
+                    — ${conf.passed}/${conf.total} validées (${conf.pct}%)</div>
+                <div class="bg-slate-800 h-2 rounded mt-2 overflow-hidden"><div class="${conf.grade.cls} h-2" style="width:${conf.pct}%"></div></div>
+                ${neutral ? `<div class="text-xs text-yellow-400 mt-2">Signal global neutre : les confirmations portent sur le biais le plus proche, à prendre avec prudence.</div>` : ""}
+            </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+            ${conf.items.map(i => `
+                <div class="flex items-start gap-2 py-1 border-b border-slate-800">
+                    <div class="w-4 text-center">${icon(i.ok)}</div>
+                    <div><div>${i.label}</div><div class="text-xs text-slate-400">${escapeHtml(i.detail)}</div></div>
+                </div>`).join("")}
+        </div>`;
+}
 
-    if(scores.length === 0)
+function renderPlan(g, conf) {
+    const el = $("plan");
+    const base = state.data[state.settings.atrTf];
+    if (!g || !base || !base.a) { el.innerHTML = `<span class="text-slate-500">En attente de données...</span>`; return; }
+    const price = base.a.price, atr = base.a.atr, mult = state.settings.slMult;
+    const dir = g.score >= 60 ? 1 : g.score <= 40 ? -1 : 0;
+    if (!dir) {
+        el.innerHTML = `<div class="text-yellow-400 font-bold">Pas de setup clair (score ${g.score}%).</div>
+            <div class="text-slate-400">Attendre un score ≥ 60 (achat) ou ≤ 40 (vente), ou trader les extrémités du range.</div>`;
         return;
+    }
+    const risk = atr * mult;
+    const row = (t, v, cls = "") => `<div class="flex justify-between bg-slate-900 rounded px-3 py-2"><span>${t}</span><span class="font-bold ${cls}">${v}</span></div>`;
+    const lvl = (r) => fmt(price + dir * risk * r);
 
-    const confidence =
-        Math.round(
-            scores.reduce((a,b)=>a+b,0) /
-            scores.length
-        );
+    const { capital, riskPct } = state.settings;
+    const riskAmount = capital * riskPct / 100;
+    const oz = riskAmount / risk;
+    const lots = oz / 100;
 
-    const signal =
-        confidence >= 60
-        ? "BUY"
-        : confidence <= 40
-        ? "SELL"
-        : "NEUTRAL";
+    const L = getLevels();
+    const ahead = L ? L.levels.filter(x => dir > 0 ? x.v > price : x.v < price).map(x => ({ ...x, d: Math.abs(x.v - price) })).sort((a, b) => a.d - b.d)[0] : null;
+    const rr = ahead ? ahead.d / risk : null;
 
-    const signalEl =
-        document.getElementById("globalSignal");
-
-    signalEl.innerText = signal;
-
-    signalEl.className =
-    `text-4xl font-bold text-center ${
-        confidence >= 60
-        ? 'text-green-500'
-        : confidence <=40
-          ? 'text-red-500'
-          : 'text-yellow-400'
-    }`;
-
-    document.getElementById("confidenceText")
-        .innerText = confidence + "%";
-
-    document.getElementById("confidenceBar")
-        .style.width = confidence + "%";
+    let html =
+        `<div class="font-bold ${dir > 0 ? "text-green-500" : "text-red-500"}">${dir > 0 ? "Scénario ACHAT" : "Scénario VENTE"} (score ${g.score}%${conf ? `, confirmation ${conf.grade.l}` : ""})</div>` +
+        row("Entrée (prix actuel)", fmt(price)) +
+        row(`Stop-loss (${mult} × ATR ${tfLabel(state.settings.atrTf)} = ${fmt(risk)})`, fmt(price - dir * risk), "text-red-400") +
+        row("TP1 (1.5 R)", lvl(1.5), "text-green-400") +
+        row("TP2 (3 R)", lvl(3), "text-green-400") +
+        row(`Risque (${riskPct} % de ${capital} $)`, fmt(riskAmount) + " $") +
+        row("Taille de position", `${lots.toFixed(2)} lot (${oz.toFixed(1)} oz)`, "text-amber-400");
+    if (ahead) {
+        html += row(`Prochain obstacle : ${ahead.n}`, `${fmt(ahead.v)} (R:R ${rr.toFixed(1)})`, rr >= 1.5 ? "text-green-400" : "text-yellow-400");
+        if (rr < 1.5) html += `<div class="text-xs text-yellow-400">Le prochain niveau est proche (R:R &lt; 1.5) : TP1 risque d'être bloqué avant d'être atteint.</div>`;
+    }
+    if (conf && conf.grade.l === "D") html += `<div class="text-xs text-red-400">Confirmations insuffisantes : scénario déconseillé.</div>`;
+    html += `<div class="text-xs text-slate-400">1 lot = 100 oz. Position calculée pour que le stop-loss coûte exactement le risque choisi.</div>`;
+    el.innerHTML = html;
 }
 
-</script>
+function renderAll() {
+    renderSessions();
+    renderSummaryTable();
+    renderMatrix();
+    const g = renderGlobal();
+    const conf = g ? computeConfirmations(g) : null;
+    renderLevels();
+    renderConfirmations(conf, g);
+    renderPlan(g, conf);
+}
 
+/* ---------- Chargement des données ---------- */
+
+async function fetchCandles(interval, apiKey) {
+    const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(SYMBOL)}`
+        + `&interval=${interval}&outputsize=${OUTPUT_SIZE}&order=ASC&apikey=${encodeURIComponent(apiKey)}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (data.status === "error" || !Array.isArray(data.values)) {
+        const err = new Error(data.message || "Réponse invalide");
+        err.code = data.code;
+        throw err;
+    }
+    return data.values
+        .map(v => ({ o: parseFloat(v.open), h: parseFloat(v.high), l: parseFloat(v.low), c: parseFloat(v.close) }))
+        .filter(v => !isNaN(v.c) && !isNaN(v.h) && !isNaN(v.l));
+}
+
+function getApiKey() {
+    return $("apiKey").value.trim() || DEFAULT_API_KEY;
+}
+
+async function loadHeatmap() {
+    if (state.loading) return;
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        showStatus("Entrez votre clé API Twelve Data puis cliquez sur « Sauver ».", "warn");
+        return;
+    }
+
+    state.loading = true;
+    state.data = {};
+    $("spinner").classList.remove("hidden");
+    $("refreshBtn").disabled = true;
+    showStatus("Chargement des données...", "info");
+    renderAll();
+
+    let fatal = false, errors = 0, lastPrice = null;
+
+    for (let i = 0; i < TIMEFRAMES.length; i++) {
+        const tf = TIMEFRAMES[i];
+        try {
+            const candles = await fetchCandles(tf.interval, apiKey);
+            const a = analyse(candles);
+            if (!a) throw new Error("Pas assez de données pour calculer les indicateurs");
+            state.data[tf.interval] = { a };
+            if (tf.interval === "1min" || lastPrice === null) lastPrice = a.price;
+        } catch (e) {
+            errors++;
+            state.data[tf.interval] = { error: e.message };
+            // Clé invalide (401) ou quota dépassé (429) : inutile de continuer
+            if (e.code === 401 || e.code === 429) {
+                fatal = true;
+                for (let j = i + 1; j < TIMEFRAMES.length; j++) state.data[TIMEFRAMES[j].interval] = { error: "Non chargé" };
+                renderAll();
+                break;
+            }
+        }
+        renderAll();
+    }
+
+    if (lastPrice !== null) $("price").textContent = fmt(lastPrice) + " $";
+    $("updated").textContent = "Dernière mise à jour : " + new Date().toLocaleTimeString("fr-FR");
+
+    if (fatal) showStatus("Erreur API : vérifiez votre clé ou attendez la fin de la limite de requêtes (1 min).", "error");
+    else if (errors) showStatus(`${errors} timeframe(s) en erreur.`, "warn");
+    else showStatus("");
+
+    state.loading = false;
+    $("spinner").classList.add("hidden");
+    $("refreshBtn").disabled = false;
+    renderAll();
+}
+
+/* ---------- Clé API ---------- */
+
+function updateKeyBadge() {
+    const stored = localStorage.getItem(KEY_STORAGE);
+    const badge = $("keyBadge");
+    if (stored) {
+        badge.textContent = `✔ Clé enregistrée (localStorage) •••• ${stored.slice(-4)}`;
+        badge.className = "text-xs px-2 py-1 rounded bg-green-900/50 text-green-300";
+    } else if (DEFAULT_API_KEY) {
+        badge.textContent = "Clé définie dans le fichier (DEFAULT_API_KEY)";
+        badge.className = "text-xs px-2 py-1 rounded bg-blue-900/50 text-blue-300";
+    } else {
+        badge.textContent = "Aucune clé enregistrée";
+        badge.className = "text-xs px-2 py-1 rounded bg-slate-700 text-slate-300";
+    }
+}
+
+function saveKey() {
+    const key = $("apiKey").value.trim();
+    if (!key) { showStatus("La clé est vide.", "warn"); return; }
+    localStorage.setItem(KEY_STORAGE, key);
+    updateKeyBadge();
+    loadHeatmap();
+}
+
+function setAutoRefresh(enabled) {
+    clearInterval(state.autoTimer);
+    state.autoTimer = enabled ? setInterval(loadHeatmap, 60000) : null;
+    localStorage.setItem(AUTO_STORAGE, enabled ? "1" : "0");
+}
+
+/* ---------- Initialisation ---------- */
+
+function initOptions() {
+    $("profile").innerHTML = Object.entries(PROFILES)
+        .map(([k, p]) => `<option value="${k}">${p.name}</option>`).join("");
+    $("atrTf").innerHTML = TIMEFRAMES.map(t => `<option value="${t.interval}">${t.label}</option>`).join("");
+    $("profile").value = state.settings.profile;
+    $("atrTf").value = state.settings.atrTf;
+    $("slMult").value = state.settings.slMult;
+    $("capital").value = state.settings.capital;
+    $("riskPct").value = state.settings.riskPct;
+    const bindNumber = (id, key) => $(id).addEventListener("input", e => {
+        const v = parseFloat(e.target.value);
+        if (!isNaN(v) && v > 0) { state.settings[key] = v; saveSettings(); renderAll(); }
+    });
+    bindNumber("capital", "capital");
+    bindNumber("riskPct", "riskPct");
+
+    $("indicatorToggles").innerHTML = INDICATORS.map(i => `
+        <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" data-ind="${i.id}" class="accent-amber-500" ${state.settings.enabled[i.id] ? "checked" : ""}>
+            ${i.label}
+        </label>`).join("");
+
+    $("indicatorToggles").addEventListener("change", e => {
+        const id = e.target.dataset.ind;
+        if (!id) return;
+        state.settings.enabled[id] = e.target.checked;
+        saveSettings();
+        renderAll();
+    });
+    $("profile").addEventListener("change", e => { state.settings.profile = e.target.value; saveSettings(); renderAll(); });
+    $("atrTf").addEventListener("change", e => { state.settings.atrTf = e.target.value; saveSettings(); renderAll(); });
+    $("slMult").addEventListener("input", e => {
+        const v = parseFloat(e.target.value);
+        if (!isNaN(v) && v > 0) { state.settings.slMult = v; saveSettings(); renderAll(); }
+    });
+}
+
+$("saveKey").addEventListener("click", saveKey);
+$("refreshBtn").addEventListener("click", loadHeatmap);
+$("apiKey").addEventListener("keydown", e => { if (e.key === "Enter") saveKey(); });
+$("toggleKey").addEventListener("click", () => {
+    const input = $("apiKey");
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    $("toggleKey").textContent = show ? "Masquer" : "Afficher";
+});
+$("clearKey").addEventListener("click", () => {
+    localStorage.removeItem(KEY_STORAGE);
+    $("apiKey").value = "";
+    state.data = {};
+    updateKeyBadge();
+    renderAll();
+    showStatus("Clé effacée du navigateur.", "info");
+});
+$("autoRefresh").addEventListener("change", e => setAutoRefresh(e.target.checked));
+
+window.addEventListener("load", () => {
+    initOptions();
+    const key = localStorage.getItem(KEY_STORAGE);
+    if (key) $("apiKey").value = key;
+    updateKeyBadge();
+    renderAll();
+    setInterval(renderSessions, 60000);
+
+    if (localStorage.getItem(AUTO_STORAGE) === "1") {
+        $("autoRefresh").checked = true;
+        setAutoRefresh(true);
+    }
+    if (getApiKey()) loadHeatmap();
+    else showStatus("Entrez votre clé API Twelve Data pour commencer.", "info");
+});
+</script>
 </body>
 </html>
