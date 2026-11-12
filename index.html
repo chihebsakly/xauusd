@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>XAU/USD Heatmap Twelve Data</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+body{
+    background:#0b0e14;
+    color:white;
+}
+
+.card{
+    background:#131722;
+    border:1px solid #2a2e39;
+}
+</style>
+</head>
+
+<body class="p-6">
+
+<div class="max-w-6xl mx-auto">
+
+    <h1 class="text-3xl font-bold mb-6">
+        XAU/USD Heatmap
+    </h1>
+
+    <!-- API KEY -->
+
+    <div class="card rounded-xl p-4 mb-6">
+
+        <label class="block text-sm mb-2">
+            Clé API Twelve Data
+        </label>
+
+        <div class="flex gap-2">
+
+            <input
+                id="apiKey"
+                type="password"
+                placeholder="Entrer votre clé API"
+                class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2"
+            >
+
+            <button
+                onclick="saveKey()"
+                class="bg-amber-500 text-black px-4 rounded font-bold">
+                Sauver
+            </button>
+
+        </div>
+
+    </div>
+
+    <!-- SIGNAL -->
+
+    <div class="card rounded-xl p-6 mb-6">
+
+        <h2 class="text-xl font-bold mb-4">
+            Signal Global
+        </h2>
+
+        <div id="globalSignal"
+            class="text-4xl font-bold text-center">
+            EN ATTENTE
+        </div>
+
+        <div class="mt-4">
+
+            <div class="flex justify-between mb-2">
+                <span>Confiance</span>
+                <span id="confidenceText">
+                    0%
+                </span>
+            </div>
+
+            <div class="bg-slate-800 h-4 rounded-full overflow-hidden">
+
+                <div
+                    id="confidenceBar"
+                    class="bg-green-500 h-4"
+                    style="width:0%">
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- HEATMAP -->
+
+    <div class="card rounded-xl p-6">
+
+        <div class="flex justify-between items-center mb-4">
+
+            <h2 class="text-xl font-bold">
+                Heatmap Multi Timeframe
+            </h2>
+
+            <button
+                onclick="loadHeatmap()"
+                class="bg-amber-500 text-black px-4 py-2 rounded font-bold">
+
+                Actualiser
+
+            </button>
+
+        </div>
+
+        <table class="w-full">
+
+            <thead>
+
+            <tr class="border-b border-slate-700">
+
+                <th class="text-left p-3">TF</th>
+                <th class="p-3">RSI</th>
+                <th class="p-3">Signal</th>
+                <th class="p-3">Score</th>
+
+            </tr>
+
+            </thead>
+
+            <tbody id="heatmapBody">
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<script>
+
+const SYMBOL = "XAU/USD";
+
+const TIMEFRAMES = [
+    {label:"M1", interval:"1min"},
+    {label:"M5", interval:"5min"},
+    {label:"M15", interval:"15min"},
+    {label:"H1", interval:"1h"},
+    {label:"H4", interval:"4h"},
+    {label:"D1", interval:"1day"}
+];
+
+function saveKey(){
+
+    localStorage.setItem(
+        "twelve_api_key",
+        document.getElementById("apiKey").value
+    );
+
+    alert("Clé sauvegardée");
+}
+
+window.onload = () => {
+
+    const key =
+        localStorage.getItem("twelve_api_key");
+
+    if(key)
+        document.getElementById("apiKey").value = key;
+
+    loadHeatmap();
+};
+
+function getSignal(rsi){
+
+    if(rsi >= 60)
+        return "BUY";
+
+    if(rsi <= 40)
+        return "SELL";
+
+    return "NEUTRAL";
+}
+
+function getScore(rsi){
+
+    return Math.round(rsi);
+}
+
+function getColor(score){
+
+    if(score >= 60)
+        return "text-green-500";
+
+    if(score <= 40)
+        return "text-red-500";
+
+    return "text-yellow-400";
+}
+
+async function loadHeatmap(){
+
+    const apiKey =
+        document.getElementById("apiKey").value.trim();
+
+    if(!apiKey)
+        return;
+
+    const body =
+        document.getElementById("heatmapBody");
+
+    body.innerHTML = "";
+
+    let scores = [];
+
+    for(const tf of TIMEFRAMES){
+
+        try{
+
+            const url =
+                `https://api.twelvedata.com/rsi?symbol=${encodeURIComponent(SYMBOL)}&interval=${tf.interval}&apikey=${apiKey}`;
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            const rsi =
+                parseFloat(data.value);
+
+            if(isNaN(rsi))
+                continue;
+
+            const signal =
+                getSignal(rsi);
+
+            const score =
+                getScore(rsi);
+
+            scores.push(score);
+
+            body.innerHTML += `
+
+            <tr class="border-b border-slate-800">
+
+                <td class="p-3 font-bold">
+                    ${tf.label}
+                </td>
+
+                <td class="p-3 text-center">
+                    ${rsi.toFixed(2)}
+                </td>
+
+                <td class="p-3 text-center ${getColor(score)} font-bold">
+                    ${signal}
+                </td>
+
+                <td class="p-3">
+
+                    <div class="flex items-center gap-3">
+
+                        <div class="flex-1 bg-slate-800 rounded h-3 overflow-hidden">
+
+                            <div
+                                class="bg-green-500 h-3"
+                                style="width:${score}%">
+                            </div>
+
+                        </div>
+
+                        <span>
+                            ${score}%
+                        </span>
+
+                    </div>
+
+                </td>
+
+            </tr>
+
+            `;
+
+        }
+        catch(error){
+
+            console.error(error);
+
+        }
+    }
+
+    updateGlobal(scores);
+}
+
+function updateGlobal(scores){
+
+    if(scores.length === 0)
+        return;
+
+    const confidence =
+        Math.round(
+            scores.reduce((a,b)=>a+b,0) /
+            scores.length
+        );
+
+    const signal =
+        confidence >= 60
+        ? "BUY"
+        : confidence <= 40
+        ? "SELL"
+        : "NEUTRAL";
+
+    const signalEl =
+        document.getElementById("globalSignal");
+
+    signalEl.innerText = signal;
+
+    signalEl.className =
+    `text-4xl font-bold text-center ${
+        confidence >= 60
+        ? 'text-green-500'
+        : confidence <=40
+          ? 'text-red-500'
+          : 'text-yellow-400'
+    }`;
+
+    document.getElementById("confidenceText")
+        .innerText = confidence + "%";
+
+    document.getElementById("confidenceBar")
+        .style.width = confidence + "%";
+}
+
+</script>
+
+</body>
+</html>
